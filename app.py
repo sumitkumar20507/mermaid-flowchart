@@ -163,6 +163,7 @@ def get_mermaid_component(mermaid_code):
 
             renderBtn.addEventListener("click", renderDiagram);
 
+            // --- SVG Download ---
             downloadSvgBtn.addEventListener("click", () => {{
                 if (!currentSvgData) return;
 
@@ -202,6 +203,7 @@ def get_mermaid_component(mermaid_code):
                 }}
             }});
 
+            // --- PDF Export (single page, zoomable vector) ---
             downloadPdfBtn.addEventListener("click", () => {{
                 if (!currentSvgData) return;
 
@@ -228,9 +230,28 @@ def get_mermaid_component(mermaid_code):
                     const printWindow = window.open("", "_blank");
                     printWindow.document.write(`
                         <html>
-                        <head><title>Mermaid PDF Export</title></head>
+                        <head>
+                            <title>Mermaid PDF Export</title>
+                            <style>
+                                @page {{
+                                    size: A4 landscape;
+                                    margin: 0;
+                                }}
+                                html, body {{
+                                    margin: 0;
+                                    padding: 0;
+                                    height: 100%;
+                                    width: 100%;
+                                }}
+                                img {{
+                                    width: 100%;
+                                    height: 100%;
+                                    object-fit: contain; /* Ensures diagram fits exactly one page */
+                                }}
+                            </style>
+                        </head>
                         <body>
-                            <img src="${{url}}" style="width:100%;height:auto;" onload="window.print();">
+                            <img src="${{url}}" onload="window.print();">
                         </body>
                         </html>
                     `);
@@ -320,7 +341,7 @@ st.markdown("""
 - Diagrams render automatically when you type  
 - Use the white background for better contrast  
 - SVG downloads are vector format for infinite scaling  
-- PDF downloads open in a new tab → use browser **Save as PDF**  
+- PDF downloads are **single-page, zoomable vector diagrams**  
 
 **🔗 Mermaid Documentation:** [mermaid.js.org](https://mermaid.js.org/)
 """)
