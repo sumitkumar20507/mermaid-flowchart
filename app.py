@@ -1,6 +1,7 @@
 # --- START OF FILE app.py ---
 
 import streamlit as st
+import streamlit.components.v1 as components
 import base64
 
 # --- Page Configuration ---
@@ -200,12 +201,6 @@ st.title("Mermaid Diagram Generator")
 st.write("Enter your Mermaid code on the left and see the rendered diagram on the right. Download as SVG or high-resolution PNG.")
 
 default_code = """
-graph TD
-    A[Start] --> B{Is it working?};
-    B -- Yes --> C[Great!];
-    B -- No --> D[Check console];
-    C --> E[Finish];
-    D --> B;
 """
 
 col1, col2 = st.columns(spec=[1, 1], gap="large")
@@ -233,4 +228,4 @@ with col2:
     )
     
     # Use the corrected st.html call
-    st.html(component_with_code, height=800, scrolling=True)
+    components.html(component_with_code, height=800, scrolling=True)
