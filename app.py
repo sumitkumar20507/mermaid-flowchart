@@ -2,16 +2,11 @@
 
 import streamlit as st
 import streamlit.components.v1 as components
-import base64
 import json
 
 # --- Page Configuration ---
-# Set the page to a wide layout with a dark theme by default.
 st.set_page_config(layout="wide", page_title="Mermaid Diagram Generator")
 
-# --- HTML & JavaScript Component ---
-# This self-contained component handles the frontend, including the dark theme styling,
-# Mermaid.js rendering, and the SVG/PNG download logic.
 def get_mermaid_component(mermaid_code):
     return f"""
 <!DOCTYPE html>
@@ -19,11 +14,10 @@ def get_mermaid_component(mermaid_code):
 <head>
     <meta charset="UTF-8">
     <title>Mermaid Component</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <style>
-        /* --- Dark Theme Styling --- */
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #0e1117;
             color: #f0f6fc;
             margin: 0;
@@ -59,17 +53,16 @@ def get_mermaid_component(mermaid_code):
             cursor: not-allowed;
             border-color: #30363d;
         }}
-        /* Specific styles for download buttons */
         #download-svg-btn {{
-            background-color: #238636; /* Green */
+            background-color: #238636;
         }}
-        #download-svg-btn:hover {{
+        #download-svg-btn:hover:not(:disabled) {{
             background-color: #2ea043;
         }}
         #download-png-btn {{
-            background-color: #1f6feb; /* Blue */
+            background-color: #1f6feb;
         }}
-        #download-png-btn:hover {{
+        #download-png-btn:hover:not(:disabled) {{
             background-color: #388bfd;
         }}
         .mermaid-output {{
@@ -84,7 +77,6 @@ def get_mermaid_component(mermaid_code):
             justify-content: center;
             align-items: center;
         }}
-        /* Style for error messages */
         .mermaid-output pre {{
             background-color: rgba(248, 81, 73, 0.1);
             color: #f85149;
@@ -94,6 +86,20 @@ def get_mermaid_component(mermaid_code):
             word-wrap: break-word;
             width: 100%;
         }}
+        /* Mermaid diagram styling for better visibility */
+        .mermaid-output svg {{
+            max-width: 100%;
+            height: auto;
+            background-color: white;
+            border-radius: 4px;
+        }}
+        #mermaid-container {{
+            background-color: white;
+            border-radius: 4px;
+            padding: 20px;
+            display: inline-block;
+            min-width: 300px;
+        }}
     </style>
 </head>
 <body>
@@ -101,7 +107,7 @@ def get_mermaid_component(mermaid_code):
         <div class="buttons">
             <button id="render-btn">Render Diagram</button>
             <button id="download-svg-btn" disabled>Download SVG</button>
-            <button id="download-png-btn" disabled>Download PNG</button>
+            <button id="download-png-btn" disabled>Download PNG (5x)</button>
         </div>
         <div id="output" class="mermaid-output">
             <p style="color: #8b949e;">Your rendered diagram will appear here.</p>
@@ -109,13 +115,46 @@ def get_mermaid_component(mermaid_code):
     </div>
 
     <script>
-        // Mermaid code injected from Streamlit
         const mermaidCode = {json.dumps(mermaid_code)};
+        let currentSvgData = "";
+        let currentDiagramId = "";
 
         document.addEventListener("DOMContentLoaded", function () {{
-            mermaid.initialize({{ startOnLoad: false, theme: 'dark' }});
+            // Configure Mermaid for high-quality rendering
+            mermaid.initialize({{
+                startOnLoad: false,
+                theme: 'default', // Use default theme for better contrast
+                themeVariables: {{
+                    primaryColor: '#ff6b6b',
+                    primaryTextColor: '#000000',
+                    primaryBorderColor: '#7C0000',
+                    lineColor: '#000000',
+                    secondaryColor: '#006100',
+                    tertiaryColor: '#fff'
+                }},
+                flowchart: {{
+                    htmlLabels: true,
+                    curve: 'basis',
+                    useMaxWidth: true,
+                    nodeSpacing: 50,
+                    rankSpacing: 50
+                }},
+                sequence: {{
+                    diagramMarginX: 50,
+                    diagramMarginY: 10,
+                    boxTextMargin: 5,
+                    noteMargin: 10,
+                    messageMargin: 35,
+                    mirrorActors: true,
+                    useMaxWidth: true
+                }},
+                gantt: {{
+                    useMaxWidth: true,
+                    leftPadding: 75,
+                    gridLineStartPadding: 35
+                }}
+            }});
 
-            let currentSvgData = "";
             const outputDiv = document.getElementById("output");
             const renderBtn = document.getElementById("render-btn");
             const downloadSvgBtn = document.getElementById("download-svg-btn");
@@ -127,21 +166,32 @@ def get_mermaid_component(mermaid_code):
                     return;
                 }}
                 
-                outputDiv.innerHTML = "Rendering...";
+                outputDiv.innerHTML = "Rendering diagram...";
                 downloadSvgBtn.disabled = true;
                 downloadPngBtn.disabled = true;
                 currentSvgData = "";
 
                 try {{
-                    const graphId = "graphDiv_" + new Date().getTime();
-                    const {{ svg }} = await mermaid.render(graphId, mermaidCode);
-                    outputDiv.innerHTML = svg;
+                    // Create unique ID for this render
+                    currentDiagramId = "mermaid-" + Date.now();
+                    
+                    // Render the diagram
+                    const {{ svg }} = await mermaid.render(currentDiagramId, mermaidCode);
+                    
+                    // Create container with white background for better visibility
+                    outputDiv.innerHTML = `<div id="mermaid-container">${{svg}}</div>`;
+                    
+                    // Store the clean SVG data
                     currentSvgData = svg;
+                    
+                    // Enable download buttons
                     downloadSvgBtn.disabled = false;
                     downloadPngBtn.disabled = false;
+                    
                 }} catch (err) {{
+                    console.error("Mermaid render error:", err);
                     const errorMessage = err.message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                    outputDiv.innerHTML = `<pre><b>Error:</b>\\n${{errorMessage}}</pre>`;
+                    outputDiv.innerHTML = `<pre><b>Mermaid Error:</b>\\n${{errorMessage}}</pre>`;
                 }}
             }};
             
@@ -149,48 +199,117 @@ def get_mermaid_component(mermaid_code):
 
             downloadSvgBtn.addEventListener("click", () => {{
                 if (!currentSvgData) return;
-                const blob = new Blob([currentSvgData], {{ type: "image/svg+xml;charset=utf-8" }});
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = "diagram.svg";
-                link.click();
-                URL.revokeObjectURL(url);
+                
+                try {{
+                    // Create enhanced SVG with proper styling
+                    const enhancedSvg = currentSvgData.replace(
+                        '<svg ', 
+                        '<svg style="background-color: white;" '
+                    );
+                    
+                    const blob = new Blob([enhancedSvg], {{ 
+                        type: "image/svg+xml;charset=utf-8" 
+                    }});
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = "mermaid-diagram.svg";
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }} catch (error) {{
+                    console.error("SVG download error:", error);
+                    alert("Failed to download SVG: " + error.message);
+                }}
             }});
 
-            downloadPngBtn.addEventListener("click", () => {{
+            downloadPngBtn.addEventListener("click", async () => {{
                 if (!currentSvgData) return;
+                
+                const originalText = downloadPngBtn.textContent;
+                downloadPngBtn.disabled = true;
+                downloadPngBtn.textContent = 'Generating PNG...';
+                
+                try {{
+                    // Get the rendered SVG element to measure dimensions
+                    const container = document.getElementById('mermaid-container');
+                    const svgElement = container ? container.querySelector('svg') : null;
+                    
+                    if (!svgElement) {{
+                        throw new Error('No SVG element found');
+                    }}
 
-                const img = new Image();
-                const svgBlob = new Blob([currentSvgData], {{ type: 'image/svg+xml' }});
-                const url = URL.createObjectURL(svgBlob);
-
-                img.onload = function() {{
-                    const scale = 3; // For high-resolution PNG
+                    // Get the actual rendered dimensions
+                    const rect = svgElement.getBoundingClientRect();
+                    const svgWidth = svgElement.viewBox.baseVal.width || rect.width || 800;
+                    const svgHeight = svgElement.viewBox.baseVal.height || rect.height || 600;
+                    
+                    console.log('SVG dimensions:', svgWidth, 'x', svgHeight);
+                    
+                    // Create a clean SVG string with white background
+                    const svgClone = svgElement.cloneNode(true);
+                    svgClone.setAttribute('width', svgWidth);
+                    svgClone.setAttribute('height', svgHeight);
+                    svgClone.style.backgroundColor = 'white';
+                    
+                    const svgString = new XMLSerializer().serializeToString(svgClone);
+                    const svgDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+                    
+                    // Create high-resolution canvas (5x scale)
+                    const scale = 5;
                     const canvas = document.createElement('canvas');
-                    canvas.width = img.width * scale;
-                    canvas.height = img.height * scale;
+                    canvas.width = svgWidth * scale;
+                    canvas.height = svgHeight * scale;
                     
                     const ctx = canvas.getContext('2d');
-                    // Fill background with white for better compatibility
+                    ctx.imageSmoothingEnabled = false; // Keep sharp edges
+                    
+                    // Fill with white background
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                    const link = document.createElement('a');
-                    link.download = 'diagram.png';
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                    URL.revokeObjectURL(url);
-                }};
-                
-                img.onerror = () => URL.revokeObjectURL(url);
-                img.src = url;
+                    // Load and draw the SVG
+                    const img = new Image();
+                    img.onload = function() {{
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        
+                        // Convert to PNG and download
+                        canvas.toBlob(function(blob) {{
+                            if (blob) {{
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = 'mermaid-diagram-5x.png';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                URL.revokeObjectURL(url);
+                            }} else {{
+                                throw new Error('Failed to create PNG blob');
+                            }}
+                        }}, 'image/png', 1.0);
+                    }};
+                    
+                    img.onerror = function() {{
+                        throw new Error('Failed to load SVG image');
+                    }};
+                    
+                    img.src = svgDataUrl;
+                    
+                }} catch (error) {{
+                    console.error("PNG download error:", error);
+                    alert("Failed to generate PNG: " + error.message);
+                }} finally {{
+                    downloadPngBtn.disabled = false;
+                    downloadPngBtn.textContent = originalText;
+                }}
             }});
 
-            // Initial render on page load
-            renderDiagram();
+            // Auto-render on page load
+            if (mermaidCode.trim()) {{
+                renderDiagram();
+            }}
         }});
     </script>
 </body>
@@ -198,38 +317,79 @@ def get_mermaid_component(mermaid_code):
 """
 
 # --- Streamlit App Layout ---
+st.title("🧜‍♀️ Mermaid Diagram Generator")
+st.write("Create beautiful diagrams with Mermaid syntax. Enter your code on the left and see the high-quality rendered diagram on the right.")
 
-st.title("Mermaid Diagram Generator")
-st.write("Enter your Mermaid code on the left and see the rendered diagram on the right. Download as SVG or high-resolution PNG.")
+# Enhanced default example
+default_code = """graph TB
+    A[Christmas] -->|Get money| B(Go shopping)
+    B --> C{Let me think}
+    C -->|One| D[Laptop]
+    C -->|Two| E[iPhone]
+    C -->|Three| F[fa:fa-car Car]
+    
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style D fill:#bbf,stroke:#333,stroke-width:2px"""
 
-# Default example code to get users started
-default_code = """graph TD
-    A[Start] --> B{Is it?}
-    B -->|Yes| C[OK]
-    C --> D[Rethink]
-    D --> B
-    B ---->|No| E[End]"""
-
-col1, col2 = st.columns(spec=[1, 1], gap="large")
+col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
-    st.subheader("Mermaid Code")
+    st.subheader("📝 Mermaid Code")
+    
+    # Add some helpful examples
+    with st.expander("📚 Example Diagrams"):
+        st.markdown("""
+        **Flowchart:**
+        ```
+        graph TD
+            A[Start] --> B{Decision}
+            B -->|Yes| C[Action 1]
+            B -->|No| D[Action 2]
+        ```
+        
+        **Sequence Diagram:**
+        ```
+        sequenceDiagram
+            Alice->>John: Hello John, how are you?
+            John-->>Alice: Great!
+        ```
+        
+        **Gantt Chart:**
+        ```
+        gantt
+            title A Gantt Diagram
+            dateFormat  YYYY-MM-DD
+            section Section
+            A task           :a1, 2014-01-01, 30d
+        ```
+        """)
+    
     if 'mermaid_code' not in st.session_state:
         st.session_state.mermaid_code = default_code
     
     mermaid_code_input = st.text_area(
-        "Enter your Mermaid code below:", 
-        height=750, 
+        "Enter your Mermaid code:",
+        height=600,
         key="mermaid_code",
-        label_visibility="collapsed"
+        placeholder="Enter your Mermaid diagram code here...",
+        help="Write your Mermaid diagram syntax here. The diagram will auto-render."
     )
 
 with col2:
-    st.subheader("Rendered Diagram")
+    st.subheader("🎨 Rendered Diagram")
     
-    # Generate the HTML component with the current Mermaid code
+    # Generate and display the component
     component_html = get_mermaid_component(mermaid_code_input)
-    
-    # Render the component
-    components.html(component_html, height=800, scrolling=True)
-    
+    components.html(component_html, height=700, scrolling=True)
+
+# Add footer with tips
+st.markdown("---")
+st.markdown("""
+**💡 Tips:**
+- Diagrams render automatically when you type
+- Use the white background for better contrast
+- PNG downloads are 5x resolution for crisp printing
+- SVG downloads are vector format for infinite scaling
+
+**🔗 Mermaid Documentation:** [mermaid.js.org](https://mermaid.js.org/)
+""")
