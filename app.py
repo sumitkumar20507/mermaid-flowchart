@@ -16,7 +16,11 @@ def get_mermaid_component(mermaid_code):
     <!-- jsPDF + svg2pdf -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.0.0/svg2pdf.min.js"></script>
-    <style>
+    <script>
+        // Ensure svg2pdf is globally available
+        window.svg2pdf = window.svg2pdf || svg2pdf;
+    </script>
+
         body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #0e1117;
