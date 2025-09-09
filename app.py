@@ -240,4 +240,5 @@ with col2:
         f"atob('{escaped_code}')"
     )
     
-    st.components.v1.html(component_with_code, height=800, scrolling=True)
+    # THIS IS THE NEW, CORRECT LINE
+    st.components.html(component_with_code, height=800, scrolling=True)
