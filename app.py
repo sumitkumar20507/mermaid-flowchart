@@ -13,6 +13,9 @@ def get_mermaid_component(mermaid_code):
     <meta charset="UTF-8">
     <title>Mermaid Component</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <!-- jsPDF + svg2pdf -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.0.0/svg2pdf.min.js"></script>
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -168,13 +171,7 @@ def get_mermaid_component(mermaid_code):
                 if (!currentSvgData) return;
 
                 try {{
-                    const parser = new DOMParser();
-                    const svgDoc = parser.parseFromString(currentSvgData, "image/svg+xml");
-                    const svgEl = svgDoc.documentElement;
-
-                    const enhancedSvg = new XMLSerializer().serializeToString(svgEl);
-
-                    const blob = new Blob([enhancedSvg], {{
+                    const blob = new Blob([currentSvgData], {{
                         type: "image/svg+xml;charset=utf-8"
                     }});
                     const url = URL.createObjectURL(blob);
@@ -191,7 +188,7 @@ def get_mermaid_component(mermaid_code):
                 }}
             }});
 
-            // --- PDF Export (cropped to diagram only) ---
+            // --- PDF Export using jsPDF + svg2pdf ---
             downloadPdfBtn.addEventListener("click", () => {{
                 if (!currentSvgData) return;
 
@@ -200,20 +197,34 @@ def get_mermaid_component(mermaid_code):
                     const svgDoc = parser.parseFromString(currentSvgData, "image/svg+xml");
                     const svgEl = svgDoc.documentElement;
 
-                    // Ensure proper size via viewBox
-                    if (svgEl.getAttribute("viewBox")) {{
-                        const vb = svgEl.getAttribute("viewBox").split(" ");
-                        svgEl.setAttribute("width", vb[2]);
-                        svgEl.setAttribute("height", vb[3]);
+                    // Get diagram size
+                    let width = parseFloat(svgEl.getAttribute("width"));
+                    let height = parseFloat(svgEl.getAttribute("height"));
+
+                    if (!width || !height) {{
+                        if (svgEl.getAttribute("viewBox")) {{
+                            const vb = svgEl.getAttribute("viewBox").split(" ");
+                            width = parseFloat(vb[2]);
+                            height = parseFloat(vb[3]);
+                        }} else {{
+                            width = 1200;
+                            height = 800;
+                        }}
                     }}
 
-                    const svgString = new XMLSerializer().serializeToString(svgEl);
-                    const blob = new Blob([svgString], {{ type: "image/svg+xml;charset=utf-8" }});
-                    const url = URL.createObjectURL(blob);
+                    // Initialize jsPDF
+                    const {{ jsPDF }} = window.jspdf;
+                    const pdf = new jsPDF({{
+                        orientation: width > height ? "landscape" : "portrait",
+                        unit: "pt",
+                        format: [width, height] // PDF page size matches diagram
+                    }});
 
-                    // Open raw SVG in new tab → user saves as PDF
-                    const printWindow = window.open(url, "_blank");
-                    printWindow.onload = () => printWindow.print();
+                    // Render SVG into PDF
+                    svg2pdf(svgEl, pdf, {{ x: 0, y: 0, width: width, height: height }});
+
+                    // Save PDF
+                    pdf.save("mermaid-diagram.pdf");
 
                 }} catch (error) {{
                     console.error("PDF export error:", error);
