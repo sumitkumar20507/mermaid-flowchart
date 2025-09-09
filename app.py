@@ -172,18 +172,6 @@ def get_mermaid_component(mermaid_code):
                     const svgDoc = parser.parseFromString(currentSvgData, "image/svg+xml");
                     const svgEl = svgDoc.documentElement;
 
-                    if (!svgEl.getAttribute("width") || !svgEl.getAttribute("height")) {{
-                        const vb = svgEl.getAttribute("viewBox")?.split(" ");
-                        if (vb && vb.length === 4) {{
-                            svgEl.setAttribute("width", vb[2]);
-                            svgEl.setAttribute("height", vb[3]);
-                        }} else {{
-                            svgEl.setAttribute("width", "1200");
-                            svgEl.setAttribute("height", "800");
-                        }}
-                    }}
-                    svgEl.setAttribute("style", "background-color:white");
-
                     const enhancedSvg = new XMLSerializer().serializeToString(svgEl);
 
                     const blob = new Blob([enhancedSvg], {{
@@ -203,7 +191,7 @@ def get_mermaid_component(mermaid_code):
                 }}
             }});
 
-            // --- PDF Export (single page, zoomable vector) ---
+            // --- PDF Export (cropped to diagram only) ---
             downloadPdfBtn.addEventListener("click", () => {{
                 if (!currentSvgData) return;
 
@@ -212,50 +200,20 @@ def get_mermaid_component(mermaid_code):
                     const svgDoc = parser.parseFromString(currentSvgData, "image/svg+xml");
                     const svgEl = svgDoc.documentElement;
 
-                    if (!svgEl.getAttribute("width") || !svgEl.getAttribute("height")) {{
-                        const vb = svgEl.getAttribute("viewBox")?.split(" ");
-                        if (vb && vb.length === 4) {{
-                            svgEl.setAttribute("width", vb[2]);
-                            svgEl.setAttribute("height", vb[3]);
-                        }} else {{
-                            svgEl.setAttribute("width", "1200");
-                            svgEl.setAttribute("height", "800");
-                        }}
+                    // Ensure proper size via viewBox
+                    if (svgEl.getAttribute("viewBox")) {{
+                        const vb = svgEl.getAttribute("viewBox").split(" ");
+                        svgEl.setAttribute("width", vb[2]);
+                        svgEl.setAttribute("height", vb[3]);
                     }}
 
                     const svgString = new XMLSerializer().serializeToString(svgEl);
                     const blob = new Blob([svgString], {{ type: "image/svg+xml;charset=utf-8" }});
                     const url = URL.createObjectURL(blob);
 
-                    const printWindow = window.open("", "_blank");
-                    printWindow.document.write(`
-                        <html>
-                        <head>
-                            <title>Mermaid PDF Export</title>
-                            <style>
-                                @page {{
-                                    size: A4 landscape;
-                                    margin: 0;
-                                }}
-                                html, body {{
-                                    margin: 0;
-                                    padding: 0;
-                                    height: 100%;
-                                    width: 100%;
-                                }}
-                                img {{
-                                    width: 100%;
-                                    height: 100%;
-                                    object-fit: contain; /* Ensures diagram fits exactly one page */
-                                }}
-                            </style>
-                        </head>
-                        <body>
-                            <img src="${{url}}" onload="window.print();">
-                        </body>
-                        </html>
-                    `);
-                    printWindow.document.close();
+                    // Open raw SVG in new tab → user saves as PDF
+                    const printWindow = window.open(url, "_blank");
+                    printWindow.onload = () => printWindow.print();
 
                 }} catch (error) {{
                     console.error("PDF export error:", error);
@@ -273,75 +231,25 @@ def get_mermaid_component(mermaid_code):
 """
 
 # --- Streamlit App Layout ---
-st.title("🧜‍♀️ Mermaid Diagram Generator")
-st.write("Create beautiful diagrams with Mermaid syntax. Enter your code on the left and see the high-quality rendered diagram on the right.")
-
-# Example default
-default_code = """graph TB
-    A[Christmas] -->|Get money| B(Go shopping)
-    B --> C{Let me think}
-    C -->|One| D[Laptop]
-    C -->|Two| E[iPhone]
-    C -->|Three| F[fa:fa-car Car]
-    
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style D fill:#bbf,stroke:#333,stroke-width:2px"""
+st.title("Mermaid Diagram Generator")
+st.write("Create diagrams with Mermaid syntax. Enter your code on the left and render it on the right.")
 
 col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
-    st.subheader("📝 Mermaid Code")
-
-    with st.expander("📚 Example Diagrams"):
-        st.markdown("""
-        **Flowchart:**
-        ```
-        graph TD
-            A[Start] --> B{Decision}
-            B -->|Yes| C[Action 1]
-            B -->|No| D[Action 2]
-        ```
-        
-        **Sequence Diagram:**
-        ```
-        sequenceDiagram
-            Alice->>John: Hello John, how are you?
-            John-->>Alice: Great!
-        ```
-        
-        **Gantt Chart:**
-        ```
-        gantt
-            title A Gantt Diagram
-            dateFormat  YYYY-MM-DD
-            section Section
-            A task           :a1, 2014-01-01, 30d
-        ```
-        """)
+    st.subheader("Mermaid Code")
 
     if 'mermaid_code' not in st.session_state:
-        st.session_state.mermaid_code = default_code
+        st.session_state.mermaid_code = ""  # Empty by default
 
     mermaid_code_input = st.text_area(
         "Enter your Mermaid code:",
         height=600,
         key="mermaid_code",
-        placeholder="Enter your Mermaid diagram code here...",
-        help="Write your Mermaid diagram syntax here. The diagram will auto-render."
+        placeholder="Enter your Mermaid diagram code here..."
     )
 
 with col2:
-    st.subheader("🎨 Rendered Diagram")
+    st.subheader("Rendered Diagram")
     component_html = get_mermaid_component(mermaid_code_input)
     components.html(component_html, height=700, scrolling=True)
-
-st.markdown("---")
-st.markdown("""
-**💡 Tips:**
-- Diagrams render automatically when you type  
-- Use the white background for better contrast  
-- SVG downloads are vector format for infinite scaling  
-- PDF downloads are **single-page, zoomable vector diagrams**  
-
-**🔗 Mermaid Documentation:** [mermaid.js.org](https://mermaid.js.org/)
-""")
