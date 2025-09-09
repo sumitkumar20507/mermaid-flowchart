@@ -57,10 +57,10 @@ def get_mermaid_component(mermaid_code):
         #download-svg-btn:hover:not(:disabled) {{
             background-color: #2ea043;
         }}
-        #download-png-btn {{
+        #download-pdf-btn {{
             background-color: #1f6feb;
         }}
-        #download-png-btn:hover:not(:disabled) {{
+        #download-pdf-btn:hover:not(:disabled) {{
             background-color: #388bfd;
         }}
         .mermaid-output {{
@@ -104,7 +104,7 @@ def get_mermaid_component(mermaid_code):
         <div class="buttons">
             <button id="render-btn">Render Diagram</button>
             <button id="download-svg-btn" disabled>Download SVG</button>
-            <button id="download-png-btn" disabled>Download PNG (5x)</button>
+            <button id="download-pdf-btn" disabled>Download PDF</button>
         </div>
         <div id="output" class="mermaid-output">
             <p style="color: #8b949e;">Your rendered diagram will appear here.</p>
@@ -132,7 +132,7 @@ def get_mermaid_component(mermaid_code):
             const outputDiv = document.getElementById("output");
             const renderBtn = document.getElementById("render-btn");
             const downloadSvgBtn = document.getElementById("download-svg-btn");
-            const downloadPngBtn = document.getElementById("download-png-btn");
+            const downloadPdfBtn = document.getElementById("download-pdf-btn");
 
             const renderDiagram = async () => {{
                 if (!mermaidCode.trim()) {{
@@ -142,7 +142,7 @@ def get_mermaid_component(mermaid_code):
 
                 outputDiv.innerHTML = "Rendering diagram...";
                 downloadSvgBtn.disabled = true;
-                downloadPngBtn.disabled = true;
+                downloadPdfBtn.disabled = true;
                 currentSvgData = "";
 
                 try {{
@@ -153,7 +153,7 @@ def get_mermaid_component(mermaid_code):
                     currentSvgData = svg;
 
                     downloadSvgBtn.disabled = false;
-                    downloadPngBtn.disabled = false;
+                    downloadPdfBtn.disabled = false;
                 }} catch (err) {{
                     console.error("Mermaid render error:", err);
                     const errorMessage = err.message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -202,82 +202,43 @@ def get_mermaid_component(mermaid_code):
                 }}
             }});
 
-            downloadPngBtn.addEventListener("click", async () => {{
+            downloadPdfBtn.addEventListener("click", () => {{
                 if (!currentSvgData) return;
 
-                const originalText = downloadPngBtn.textContent;
-                downloadPngBtn.disabled = true;
-                downloadPngBtn.textContent = 'Generating PNG...';
-
                 try {{
-                    const container = document.getElementById('mermaid-container');
-                    const svgElement = container ? container.querySelector('svg') : null;
+                    const parser = new DOMParser();
+                    const svgDoc = parser.parseFromString(currentSvgData, "image/svg+xml");
+                    const svgEl = svgDoc.documentElement;
 
-                    if (!svgElement) {{
-                        throw new Error('No SVG element found');
-                    }}
-
-                    let svgWidth = parseInt(svgElement.getAttribute("width"));
-                    let svgHeight = parseInt(svgElement.getAttribute("height"));
-
-                    if (!svgWidth || !svgHeight) {{
-                        if (svgElement.viewBox && svgElement.viewBox.baseVal) {{
-                            svgWidth = svgElement.viewBox.baseVal.width || 1200;
-                            svgHeight = svgElement.viewBox.baseVal.height || 800;
+                    if (!svgEl.getAttribute("width") || !svgEl.getAttribute("height")) {{
+                        const vb = svgEl.getAttribute("viewBox")?.split(" ");
+                        if (vb && vb.length === 4) {{
+                            svgEl.setAttribute("width", vb[2]);
+                            svgEl.setAttribute("height", vb[3]);
                         }} else {{
-                            svgWidth = 1200;
-                            svgHeight = 800;
+                            svgEl.setAttribute("width", "1200");
+                            svgEl.setAttribute("height", "800");
                         }}
                     }}
 
-                    const svgClone = svgElement.cloneNode(true);
-                    svgClone.setAttribute('width', svgWidth);
-                    svgClone.setAttribute('height', svgHeight);
-                    svgClone.style.backgroundColor = 'white';
+                    const svgString = new XMLSerializer().serializeToString(svgEl);
+                    const blob = new Blob([svgString], {{ type: "image/svg+xml;charset=utf-8" }});
+                    const url = URL.createObjectURL(blob);
 
-                    const svgString = new XMLSerializer().serializeToString(svgClone);
-                    const svgDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
-
-                    const scale = 5;
-                    const canvas = document.createElement('canvas');
-                    canvas.width = svgWidth * scale;
-                    canvas.height = svgHeight * scale;
-
-                    const ctx = canvas.getContext('2d');
-                    ctx.imageSmoothingEnabled = false;
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                    const img = new Image();
-                    img.onload = function() {{
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                        canvas.toBlob(function(blob) {{
-                            if (blob) {{
-                                const url = URL.createObjectURL(blob);
-                                const link = document.createElement('a');
-                                link.href = url;
-                                link.download = 'mermaid-diagram-5x.png';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                URL.revokeObjectURL(url);
-                            }} else {{
-                                throw new Error('Failed to create PNG blob');
-                            }}
-                        }}, 'image/png', 1.0);
-                    }};
-                    img.onerror = function() {{
-                        throw new Error('Failed to load SVG image');
-                    }};
-                    img.src = svgDataUrl;
+                    const printWindow = window.open("", "_blank");
+                    printWindow.document.write(`
+                        <html>
+                        <head><title>Mermaid PDF Export</title></head>
+                        <body>
+                            <img src="${{url}}" style="width:100%;height:auto;" onload="window.print();">
+                        </body>
+                        </html>
+                    `);
+                    printWindow.document.close();
 
                 }} catch (error) {{
-                    console.error("PNG download error:", error);
-                    alert("Failed to generate PNG: " + error.message);
-                }} finally {{
-                    downloadPngBtn.disabled = false;
-                    downloadPngBtn.textContent = originalText;
+                    console.error("PDF export error:", error);
+                    alert("Failed to export PDF: " + error.message);
                 }}
             }});
 
@@ -358,8 +319,8 @@ st.markdown("""
 **💡 Tips:**
 - Diagrams render automatically when you type  
 - Use the white background for better contrast  
-- PNG downloads are 5x resolution for crisp printing  
 - SVG downloads are vector format for infinite scaling  
+- PDF downloads open in a new tab → use browser **Save as PDF**  
 
 **🔗 Mermaid Documentation:** [mermaid.js.org](https://mermaid.js.org/)
 """)
