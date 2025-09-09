@@ -232,3 +232,4 @@ with col2:
     
     # Render the component
     components.html(component_html, height=800, scrolling=True)
+    
